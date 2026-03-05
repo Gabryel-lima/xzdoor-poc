@@ -18,10 +18,11 @@ O script `xzdoor.sh` é uma ferramenta CLI interativa que guia o usuário pelas 
 
 1. **Baixar** o código-fonte oficial do XZ Utils (versão 5.6.0).
 2. **Aplicar** um patch malicioso ao arquivo `crc64_fast.c`, que insere código shell reverso.
-3. **Compilar** as bibliotecas liblzma (estática e compartilhada).
-4. **Instalar** sobrescrevendo a liblzma do sistema.
-5. **Reiniciar** serviços como SSH para ativar a backdoor.
-6. **Opcionalmente**, gerar um pacote .deb falso para distribuição.
+3. **Compilar** as bibliotecas liblzma (estática e compartilhada) com suporte a `--enable-shared`.
+4. **Instalar** sobrescrevendo a liblzma do sistema no diretório correto da arquitetura (ex: `/usr/lib/x86_64-linux-gnu`).
+5. **Configurar e Reiniciar** o servidor SSH (`sshd`) para carregar a biblioteca maliciosa.
+6. **Verificação técnica** via `ldd` e inspeção de logs com `journalctl`.
+7. **Opcionalmente**, gerar um pacote `.deb` falso para distribuição.
 
 A backdoor funciona interceptando conexões SSH e executando comandos remotos quando uma chave específica é usada.
 
@@ -30,24 +31,54 @@ A backdoor funciona interceptando conexões SSH e executando comandos remotos qu
 ```mermaid
 graph TD
     A[Baixar XZ 5.6.0] --> B[Aplicar Patch Malicioso]
-    B --> C[Compilar liblzma]
-    C --> D[Instalar no Sistema]
-    D --> E[Reiniciar SSH]
-    E --> F[Backdoor Ativa]
+    B --> C[Compilar liblzma - Shared/Static]
+    C --> D[Instalar no Sistema & ldconfig]
+    D --> E[Configurar & Reiniciar SSH]
+    E --> F[Verificação Técnica LDD/Logs]
+    F --> G[Backdoor Ativa]
 ```
 
 ## 📋 Pré-requisitos
 
-- Sistema Linux (Ubuntu, Debian, Fedora, etc.)
+- Sistema Linux (Ubuntu, Debian, Fedora, CentOS, etc.)
 - Acesso root (sudo)
-- Ferramentas de compilação: `build-essential`, `autoconf`, `libtool`, `gcc`, `make`
-- `wget`, `xz-utils`, `checkinstall`
-- Ambiente virtualizado ou container (recomendado para segurança)
+- Ferramentas de compilação: `build-essential`, `autoconf`, `libtool`, `gcc`, `make`, `patch`
+- `wget`, `xz-utils`, `checkinstall`, `openssh-server`
+- Ambiente virtualizado (VM) ou container (Estritamente recomendado)
 
 ## 🚀 Uso
 
 1. Clone o repositório:
    ```bash
+   git clone https://github.com/Gabryel-lima/xzdoor-poc.git
+   cd xzdoor-poc
+   ```
+
+2. Dê permissão de execução ao script:
+   ```bash
+   chmod +x xzdoor.sh
+   ```
+
+3. Execute como root:
+   ```bash
+   sudo ./xzdoor.sh
+   ```
+
+4. Siga as opções do menu em ordem (1 a 5).
+
+### 🔑 Testando a "Chave Mágica"
+
+Após a instalação (Opção 5), o script exibirá as instruções de teste. Em uma máquina atacante:
+
+```bash
+# O payload deve estar contido na chave/assinatura enviada
+ssh -o "PubkeyAuthentication=yes" usuario@IP_DA_VM
+```
+
+**Payload POC:**
+`AAAAE2VjZS5waHA6Ly8vanVzdC1hLXRlc3QtY2Fsb`
+
+Use a **Opção 6** do script para validar se o binário `sshd` está vinculado corretamente à biblioteca infectada.
    git clone https://github.com/Gabryel-lima/xzdoor-poc.git
    cd xzdoor-poc
    ```
