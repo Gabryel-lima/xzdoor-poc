@@ -79,6 +79,8 @@ menu_principal(){
 
 # ------------ 1) download ------------
 f_download(){
+  check_root
+  install_deps
   msg "Criando diretório de trabalho: $WORKDIR"
   mkdir -p "$WORKDIR"
   cd "$WORKDIR"
@@ -194,4 +196,5 @@ f_deb_fake(){
 # ===================  ENTRYPOINT  ===================
 #[[ "${1:-}" == "--cli" ]] && menu_principal
 # Se quiser execução direta sem menu, chame funções explicitamente
+check_root
 menu_principal
