@@ -10,21 +10,17 @@ Este repositório contém um **proof of concept (POC)** didático para demonstra
 
 O XZ Utils é uma biblioteca de compressão amplamente usada no Linux. Em 2024, foi descoberta uma backdoor nas versões 5.4.6 a 5.6.1, inserida por um maintainer comprometido. Esta backdoor permite execução remota de código quando o XZ é usado pelo OpenSSH.
 
-Este POC recria o processo de instalação da backdoor de forma controlada, permitindo estudo e análise forense.
-
-## 🔧 Como Funciona
-
 O script `xzdoor.sh` é uma ferramenta CLI interativa que guia o usuário pelas etapas para:
 
-1. **Baixar** o código-fonte oficial do XZ Utils (versão 5.6.0).
-2. **Aplicar** um patch malicioso ao arquivo `crc64_fast.c`, que insere código shell reverso.
-3. **Compilar** as bibliotecas liblzma (estática e compartilhada) com suporte a `--enable-shared`.
-4. **Instalar** sobrescrevendo a liblzma do sistema no diretório correto da arquitetura (ex: `/usr/lib/x86_64-linux-gnu`).
-5. **Configurar e Reiniciar** o servidor SSH (`sshd`) para carregar a biblioteca maliciosa.
-6. **Verificação técnica** via `ldd` e inspeção de logs com `journalctl`.
-7. **Opcionalmente**, gerar um pacote `.deb` falso para distribuição.
-
-A backdoor funciona interceptando conexões SSH e executando comandos remotos quando uma chave específica é usada.
+1. **Baixar** o código-fonte oficial do XZ Utils.
+2. **Aplicar** um patch malicioso ao arquivo `crc64_fast.c`.
+3. **Compilar** as bibliotecas liblzma (estática e compartilhada).
+4. **Instalar** sobrescrevendo a liblzma do sistema.
+5. **Configurar e Reiniciar** o servidor SSH (`sshd`).
+6. **Verificação técnica** via `ldd` e inspeção de logs.
+7. **Opcionalmente**, gerar um pacote `.deb` falso.
+8. **Forçar SSH com LD_PRELOAD (Modo PoC)**: Útil se o seu SSH não carregar a liblzma nativamente (ex: distros modernas). Roda o SSH na porta **2222**.
+9. **Configuração Automática (Full Chain)**: Executa os passos 1 a 5 em sequência.
 
 ### Fluxograma do Processo
 
@@ -46,76 +42,33 @@ graph TD
 - `wget`, `xz-utils`, `checkinstall`, `openssh-server`
 - Ambiente virtualizado (VM) ou container (Estritamente recomendado)
 
-## 🚀 Uso
+## 🚀 Uso (Máquina Alvo/VM)
 
-1. Clone o repositório:
+1. Clone o repositório e dê permissão:
    ```bash
    git clone https://github.com/Gabryel-lima/xzdoor-poc.git
    cd xzdoor-poc
-   ```
-
-2. Dê permissão de execução ao script:
-   ```bash
    chmod +x xzdoor.sh
    ```
 
-3. Execute como root:
+2. Execute a instalação automática:
    ```bash
    sudo ./xzdoor.sh
    ```
+   Escolha a **Opção 9** para instalar tudo. 
+   
+3. Inicie o servidor de teste (se o LDD falhar):
+   Escolha a **Opção 8**. Isso abrirá o SSH na porta **2222** e configurará o firewall automaticamente.
 
-4. Siga as opções do menu em ordem (1 a 5).
+## ⚔️ Ataque (Máquina Atacante)
 
-### 🔑 Testando a "Chave Mágica"
+1. Use o script de trigger fornecido:
+   ```bash
+   chmod +x attacker_trigger.sh
+   ./attacker_trigger.sh <IP_DA_VM> 2222
+   ```
 
-Após a instalação (Opção 5), o script exibirá as instruções de teste. Em uma máquina atacante:
-
-```bash
-# O payload deve estar contido na chave/assinatura enviada
-ssh -o "PubkeyAuthentication=yes" usuario@IP_DA_VM
-```
+A chave maliciosa (payload) será gerada automaticamente em `/tmp/payload.pub` e enviada durante a conexão.
 
 **Payload POC:**
 `AAAAE2VjZS5waHA6Ly8vanVzdC1hLXRlc3QtY2Fsb`
-
-Use a **Opção 6** do script para validar se o binário `sshd` está vinculado corretamente à biblioteca infectada.
-   git clone https://github.com/Gabryel-lima/xzdoor-poc.git
-   cd xzdoor-poc
-   ```
-
-2. Torne o script executável:
-   ```bash
-   chmod +x xzdoor.sh
-   ```
-
-3. Execute como root:
-   ```bash
-   sudo ./xzdoor.sh
-   ```
-
-4. Siga o menu interativo para instalar a backdoor passo a passo.
-
-### Menu de Opções
-
-- **1) Baixar e extrair tarball oficial XZ**: Faz download e extração do código-fonte.
-- **2) Aplicar patch malicioso**: Modifica `crc64_fast.c` com código malicioso.
-- **3) Compilar bibliotecas**: Gera `liblzma.so` e `liblzma.a`.
-- **4) Instalar sobrescrevendo liblzma**: Substitui a biblioteca do sistema.
-- **5) Reiniciar SSH e verificar backdoor**: Ativa e testa a backdoor.
-- **6) Gerar arquivo .deb falso**: Cria pacote para distribuição (opcional).
-- **7) Sair**: Encerra o script.
-
-## ⚠️ Avisos de Segurança
-
-- **Nunca execute em produção**: Pode comprometer sistemas reais.
-- **Use em VMs isoladas**: Recomenda-se Docker, VirtualBox ou KVM.
-- **Monitore logs**: Verifique `/var/log/auth.log` e `/var/log/syslog`.
-- **Desinstale após uso**: Remova a biblioteca modificada e reinstale a oficial.
-
-## 📝 Licença
-
-Este projeto está licenciado sob a Licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
-
----
-
-**Nota:** Este POC é baseado em análises públicas da vulnerabilidade CVE-2024-3094. Use apenas para educação e pesquisa de segurança.

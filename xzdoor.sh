@@ -244,9 +244,20 @@ f_force_ssh_preload(){
   systemctl stop ssh || true
   systemctl stop sshd || true
 
+  # Garante diretório de runtime necessário para o sshd manual
+  mkdir -p /run/sshd
+  chmod 755 /run/sshd
+
+  # Força abertura da porta no firewall (UFW)
+  if command -v ufw >/dev/null 2>&1; then
+    msg "Abrindo porta 2222 no UFW..."
+    ufw allow 2222/tcp || true
+  fi
+
   msg "Iniciando SSH manual na porta 2222 com LD_PRELOAD..."
   echo -e "${YELLOW}Aperte CTRL+C para encerrar o servidor SSH de teste.${NC}"
-  LD_PRELOAD="$target_lib" /usr/sbin/sshd -D -p 2222 -e || warn "SSH encerrado."
+  # Adicionando flags de debug extras para ver erros de inicialização
+  LD_PRELOAD="$target_lib" /usr/sbin/sshd -D -p 2222 -e || warn "SSH encerrado ou erro ao iniciar."
   
   sleep 2
   menu_principal
