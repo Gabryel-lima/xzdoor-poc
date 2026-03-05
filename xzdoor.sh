@@ -124,10 +124,10 @@ f_patch(){
 # ------------ 3) compilar ------------
 f_compile(){
   cd "$WORKDIR/xz-5.6.0"
-  printf "${YELLOW}Compilar com --enable-static --disable-shared ? (s/N):${NC} "; read -r conf
+  printf "${YELLOW}Compilar com suporte a shared e static? (s/N):${NC} "; read -r conf
   [[ $conf =~ ^[Ss]$ ]] || { menu_principal; return; }
 
-  ./configure --enable-static --disable-shared --prefix="$STAGING"
+  ./configure --enable-static --enable-shared --prefix="$STAGING"
   make -j"$(nproc)"
   ok "Compilação finalizada. Bibliotecas em src/liblzma/.libs/"
   ls -lh src/liblzma/.libs/liblzma.*
